@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface CalculateRequest {
   assets: string[];
@@ -36,7 +37,7 @@ function corsHeaders() {
 }
 
 // Check which assets are missing from the database
-async function checkMissingAssets(supabase: any, assets: string[]): Promise<string[]> {
+async function checkMissingAssets(supabase: SupabaseClient, assets: string[]): Promise<string[]> {
   try {
     const { data, error } = await supabase
       .from('asset_returns')
