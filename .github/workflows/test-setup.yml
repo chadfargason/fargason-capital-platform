@@ -1,0 +1,44 @@
+name: Test Data Pipeline Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: 'Ticker to test (e.g., ARKK)'
+        required: true
+        default: 'ARKK'
+
+jobs:
+  test-setup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        cd services/data-pipeline
+        pip install -r requirements.txt
+        
+    - name: Test setup
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        cd services/data-pipeline
+        python test_setup.py
+        
+    - name: Test specific ticker
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        cd services/data-pipeline
+        echo "Testing ticker: ${{ github.event.inputs.ticker }}"
+        python add_new_asset.py "${{ github.event.inputs.ticker }}"
