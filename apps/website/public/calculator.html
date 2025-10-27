@@ -458,7 +458,7 @@
     }
 
     async function calculateReturns() {
-      const apiEndpoint = 'https://investment-chatbot-1.vercel.app/api/portfolio/calculate';
+      const apiEndpoint = 'https://your-new-chatbot-url.vercel.app/api/portfolio/calculate';
       const startDate = document.getElementById('start-date').value + '-01';
       const [y, m] = document.getElementById('end-date').value.split('-');
       const lastDay = new Date(y, m, 0).getDate();
