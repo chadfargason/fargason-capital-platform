@@ -54,22 +54,24 @@ def get_requested_assets(client: Client) -> Set[str]:
         return set()
 
 def fetch_asset_data(ticker: str, start_date: str = '2000-01-01') -> Optional[pd.DataFrame]:
-    """Fetch data for a single asset"""
-    logger.info(f"Fetching data for {ticker}...")
+    """Fetch data for a single asset using the proven approach"""
+    logger.info(f"Fetching {ticker}...")
     
     try:
+        # Create a Ticker object and use history() - Close is already dividend-adjusted
         stock = yf.Ticker(ticker)
         data = stock.history(start=start_date, end=datetime.today().strftime('%Y-%m-%d'))
         
         if data.empty:
-            logger.warning(f"No data found for {ticker}")
+            logger.warning(f"No data for {ticker}")
             return None
         
+        # Check if we have the Close column (already adjusted for dividends)
         if 'Close' not in data.columns:
             logger.error(f"No Close price data for {ticker}")
             return None
         
-        # Calculate monthly returns
+        # Use 'ME' for month-end resampling (same as original)
         monthly_prices = data['Close'].resample('ME').last()
         monthly_returns = monthly_prices.pct_change().dropna()
         
@@ -77,16 +79,14 @@ def fetch_asset_data(ticker: str, start_date: str = '2000-01-01') -> Optional[pd
             logger.warning(f"No monthly returns calculated for {ticker}")
             return None
         
-        # Create dataframe with only existing columns
+        # Create dataframe with same structure as original (3 columns only)
         df = pd.DataFrame({
             'asset_ticker': ticker,
             'return_date': monthly_returns.index.strftime('%Y-%m-%d'),
-            'monthly_return': monthly_returns.values,
-            'price': monthly_prices.values[1:],  # Skip first NaN
-            'volume': data['Volume'].resample('ME').mean().values[1:] if 'Volume' in data.columns else None
+            'monthly_return': monthly_returns.values
         })
         
-        logger.info(f"✓ Got {len(df)} months of data for {ticker}")
+        logger.info(f"✓ Got {len(df)} months of data ({df['return_date'].min()} to {df['return_date'].max()})")
         return df
         
     except Exception as e:
@@ -118,14 +118,31 @@ def validate_asset_data(df: pd.DataFrame, ticker: str) -> bool:
     return True
 
 def upload_asset_data(client: Client, df: pd.DataFrame, ticker: str) -> bool:
-    """Upload asset data to Supabase"""
+    """Upload asset data to Supabase using the proven batch approach"""
+    logger.info(f"Uploading {len(df)} records for {ticker}...")
+    
     try:
         records = df.to_dict('records')
         
-        # Use upsert to handle duplicates
-        result = client.table('asset_returns').upsert(records).execute()
+        # Upload in batches like the original (batch size 1000)
+        batch_size = 1000
+        total_batches = (len(records) + batch_size - 1) // batch_size
+        uploaded_count = 0
         
-        logger.info(f"✓ Successfully uploaded {len(records)} records for {ticker}")
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            
+            try:
+                # Use upsert like the original - this will skip existing data
+                result = client.table('asset_returns').upsert(batch).execute()
+                uploaded_count += len(batch)
+                logger.info(f"✓ Batch {batch_num}/{total_batches} uploaded ({len(batch)} rows)")
+            except Exception as e:
+                logger.error(f"✗ ERROR in batch {batch_num}: {e}")
+                return False
+        
+        logger.info(f"✓ Successfully uploaded {uploaded_count} records for {ticker}")
         return True
         
     except Exception as e:
