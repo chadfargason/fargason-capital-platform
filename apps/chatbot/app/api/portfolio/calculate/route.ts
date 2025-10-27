@@ -36,7 +36,7 @@ function corsHeaders() {
 }
 
 // Check which assets are missing from the database
-async function checkMissingAssets(supabase: ReturnType<typeof createClient>, assets: string[]): Promise<string[]> {
+async function checkMissingAssets(supabase: any, assets: string[]): Promise<string[]> {
   try {
     const { data, error } = await supabase
       .from('asset_returns')
