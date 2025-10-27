@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 
 interface AddAssetRequest {
@@ -77,7 +76,7 @@ async function addNewAsset(ticker: string): Promise<AssetResponse> {
         try {
           const result = JSON.parse(output);
           resolve(result);
-        } catch (e) {
+        } catch (parseError) {
           resolve({
             success: false,
             message: `Failed to parse Python output: ${output}`,
