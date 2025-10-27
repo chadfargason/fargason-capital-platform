@@ -4,6 +4,8 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// Portfolio Calculator API - Force redeploy to fix 404 issue
+
 interface CalculateRequest {
   assets: string[];
   weights: number[];
