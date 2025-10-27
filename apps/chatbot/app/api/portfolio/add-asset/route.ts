@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import { join } from 'path';
 
+// Add asset API endpoint - triggers automatic asset fetching
+
 interface AddAssetRequest {
   ticker: string;
 }
