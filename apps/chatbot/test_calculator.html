@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Portfolio Calculator Test</title>
+  <style>
+    body { 
+      font-family: Arial; 
+      max-width: 1000px; 
+      margin: 50px auto; 
+      padding: 20px; 
+    }
+    h1 { color: #333; }
+    button { 
+      padding: 12px 24px; 
+      margin: 10px 5px; 
+      font-size: 16px; 
+      cursor: pointer;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    button:hover { background: #0051cc; }
+    pre { 
+      background: #f4f4f4; 
+      padding: 20px; 
+      border-radius: 5px; 
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .result { margin-top: 20px; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    .loading { color: orange; }
+  </style>
+</head>
+<body>
+  <h1>🧮 Portfolio Calculator Test</h1>
+  
+  <div>
+    <h2>Test 1: Classic 60/40 Portfolio</h2>
+    <p>60% VTI (Total US Stock MArket) / 40% AGG (Bonds) from 2020-2023</p>
+    <button onclick="test1()">Calculate 60/40</button>
+    <div id="result1" class="result"></div>
+  </div>
+
+  <div>
+    <h2>Test 2: Three-Asset Portfolio</h2>
+    <p>50% SPY / 30% AGG / 20% GLD (Gold) from 2015-2024</p>
+    <button onclick="test2()">Calculate SPY/AGG/GLD</button>
+    <div id="result2" class="result"></div>
+  </div>
+
+  <div>
+    <h2>Test 3: Custom Portfolio</h2>
+    <p>You can customize this test</p>
+    <button onclick="test3()">Calculate Custom</button>
+    <div id="result3" class="result"></div>
+  </div>
+
+  <script>
+    async function calculate(assets, weights, startDate, endDate, resultId) {
+      const resultEl = document.getElementById(resultId);
+      resultEl.innerHTML = '<p class="loading">⏳ Calculating...</p>';
+      
+      try {
+        const response = await fetch('https://investment-chatbot-1.vercel.app/api/portfolio/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assets, weights, startDate, endDate, rebalanceMonths: 3 })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          resultEl.innerHTML = `
+            <p class="success">✅ Success!</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+            <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px;">
+              <strong>Summary:</strong><br>
+              📊 Total Return: ${data.results.totalReturnPercent}%<br>
+              📈 Annualized Return: ${data.results.annualizedReturnPercent}%<br>
+              📉 Volatility: ${data.results.volatilityPercent}%<br>
+              ⚖️ Sharpe Ratio: ${data.results.sharpeRatio}<br>
+              📅 Period: ${data.results.numMonths} months (${data.results.numYears} years)
+            </div>
+          `;
+        } else {
+          resultEl.innerHTML = `
+            <p class="error">❌ Error: ${data.error}</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `;
+        }
+      } catch (error) {
+        resultEl.innerHTML = `<p class="error">❌ Network Error: ${error.message}</p>`;
+      }
+    }
+
+    function test1() {
+      calculate(
+        ['VTI', 'AGG'],
+        [0.6, 0.4],
+        '2020-01-01',
+        '2023-12-31',
+        'result1'
+      );
+    }
+
+    function test2() {
+      calculate(
+        ['SPY', 'AGG', 'GLD'],
+        [0.5, 0.3, 0.2],
+        '2015-01-01',
+        '2024-10-31',
+        'result2'
+      );
+    }
+
+    function test3() {
+      calculate(
+        ['VTI', 'BND'],
+        [0.7, 0.3],
+        '2010-01-01',
+        '2024-10-31',
+        'result3'
+      );
+    }
+  </script>
+</body>
+</html>

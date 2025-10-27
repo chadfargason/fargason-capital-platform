@@ -1,0 +1,6 @@
+Password for supabase database z4V8le6QxucTsWOo
+
+url https://rhysciwzmjleziieeugv.supabase.co
+
+API Key publishable sb_publishable_qPjYHTX5b_4w0K-ywVytVw_g61YRjVp
+API Key sb_secret_czW-rrfW4crbk0v6GDPFBQ_EaM-N1dA
