@@ -77,7 +77,7 @@ def fetch_asset_data(ticker: str, start_date: str = '2000-01-01') -> Optional[pd
             logger.warning(f"No monthly returns calculated for {ticker}")
             return None
         
-        # Create dataframe
+        # Create dataframe with only existing columns
         df = pd.DataFrame({
             'asset_ticker': ticker,
             'return_date': monthly_returns.index.strftime('%Y-%m-%d'),
@@ -85,17 +85,6 @@ def fetch_asset_data(ticker: str, start_date: str = '2000-01-01') -> Optional[pd
             'price': monthly_prices.values[1:],  # Skip first NaN
             'volume': data['Volume'].resample('ME').mean().values[1:] if 'Volume' in data.columns else None
         })
-        
-        # Add metadata
-        try:
-            info = stock.info
-            df['asset_name'] = info.get('longName', ticker)
-            df['asset_category'] = info.get('sector', 'Unknown')
-            df['expense_ratio'] = info.get('expenseRatio', 0.0)
-        except:
-            df['asset_name'] = ticker
-            df['asset_category'] = 'Unknown'
-            df['expense_ratio'] = 0.0
         
         logger.info(f"✓ Got {len(df)} months of data for {ticker}")
         return df
