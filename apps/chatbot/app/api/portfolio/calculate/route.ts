@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
+import { spawn } from 'child_process';
 
 interface CalculateRequest {
   assets: string[];
@@ -32,6 +33,98 @@ function corsHeaders() {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
+}
+
+// Check which assets are missing from the database
+async function checkMissingAssets(supabase: any, assets: string[]): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('asset_returns')
+      .select('asset_ticker')
+      .in('asset_ticker', assets)
+      .limit(1000); // Reasonable limit
+
+    if (error) {
+      console.error('Error checking missing assets:', error);
+      return assets; // If we can't check, assume all are missing
+    }
+
+    const existingAssets = new Set(data?.map((row: any) => row.asset_ticker) || []);
+    const missingAssets = assets.filter(asset => !existingAssets.has(asset));
+    
+    console.log(`[Asset Check] Existing: ${existingAssets.size}, Missing: ${missingAssets.length}`);
+    return missingAssets;
+  } catch (error) {
+    console.error('Error in checkMissingAssets:', error);
+    return assets; // If error, assume all are missing
+  }
+}
+
+// Fetch missing assets using the Python script
+async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
+  if (missingAssets.length === 0) return true;
+
+  console.log(`[Asset Fetch] Fetching ${missingAssets.length} missing assets: ${missingAssets.join(', ')}`);
+  
+  return new Promise((resolve) => {
+    const pythonScript = join(process.cwd(), 'services', 'data-pipeline', 'add_new_asset.py');
+    
+    // Process assets one by one to avoid overwhelming Yahoo Finance
+    let currentIndex = 0;
+    let successCount = 0;
+    let errorCount = 0;
+
+    const processNextAsset = () => {
+      if (currentIndex >= missingAssets.length) {
+        console.log(`[Asset Fetch] Complete: ${successCount} success, ${errorCount} errors`);
+        resolve(errorCount === 0);
+        return;
+      }
+
+      const ticker = missingAssets[currentIndex];
+      console.log(`[Asset Fetch] Processing ${ticker} (${currentIndex + 1}/${missingAssets.length})`);
+      
+      const python = spawn('python', [pythonScript, ticker]);
+      
+      let output = '';
+      let error = '';
+
+      python.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      python.stderr.on('data', (data) => {
+        error += data.toString();
+      });
+
+      python.on('close', (code) => {
+        if (code === 0) {
+          try {
+            const result = JSON.parse(output);
+            if (result.success) {
+              successCount++;
+              console.log(`[Asset Fetch] ✓ ${ticker}: ${result.message}`);
+            } else {
+              errorCount++;
+              console.log(`[Asset Fetch] ✗ ${ticker}: ${result.message}`);
+            }
+          } catch (e) {
+            errorCount++;
+            console.log(`[Asset Fetch] ✗ ${ticker}: Failed to parse output`);
+          }
+        } else {
+          errorCount++;
+          console.log(`[Asset Fetch] ✗ ${ticker}: Python script failed`);
+        }
+        
+        currentIndex++;
+        // Add small delay between requests to be respectful to Yahoo Finance
+        setTimeout(processNextAsset, 1000);
+      });
+    };
+
+    processNextAsset();
+  });
 }
 
 // OPTIMIZED: Generate CSV from monthly data using array.join()
@@ -154,6 +247,16 @@ export async function POST(request: Request) {
 
     console.log(`[Portfolio Calc] Assets: ${body.assets.length}, Date range: ${body.startDate} to ${body.endDate}, CSV: ${shouldGenerateCSV}`);
 
+    // Check for missing assets and fetch them automatically
+    const missingAssets = await checkMissingAssets(supabase, body.assets);
+    if (missingAssets.length > 0) {
+      console.log(`[Portfolio Calc] Found ${missingAssets.length} missing assets, fetching...`);
+      const fetchSuccess = await fetchMissingAssets(missingAssets);
+      if (!fetchSuccess) {
+        console.warn(`[Portfolio Calc] Some assets failed to fetch, continuing with available data`);
+      }
+    }
+
     // Fetch data from Supabase
     const fetchStart = Date.now();
     const { data, error } = await supabase
@@ -170,7 +273,10 @@ export async function POST(request: Request) {
 
     if (!data || data.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No data found for specified assets and date range' },
+        { 
+          success: false, 
+          error: 'No data found for specified assets and date range. Some assets may not be available or may have failed to fetch.' 
+        },
         { status: 404, headers: corsHeaders() }
       );
     }
