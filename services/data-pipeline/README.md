@@ -1,244 +1,162 @@
-# Portfolio Data Pipeline
+# Dynamic Asset Data Pipeline
 
-Automated data fetching, processing, and storage system for financial market data.
+This enhanced data pipeline automatically fetches and adds new ETFs to your Supabase database when they're requested but not found.
 
-## 🚀 Quick Start
+## 🎯 **Features**
 
-```bash
-pip install -r requirements.txt
+- **Dynamic ETF Discovery** - Automatically fetch new ETFs when requested
+- **Smart Caching** - Check Supabase first, only fetch if missing
+- **Request Tracking** - Log which ETFs are being requested
+- **Automatic Updates** - Add new ETFs to the database
+- **Quality Validation** - Ensure new data meets standards
+- **Daily Automation** - Runs automatically via GitHub Actions
 
-# Fetch data from Yahoo Finance
-python fetch_all_assets.py
+## 🔧 **How It Works**
 
-# Upload to Supabase
-python upload_to_supabase.py
-```
-
-## 📊 Features
-
-- ✅ **50+ Asset Classes**: ETFs, stocks, bonds, commodities, crypto
-- ✅ **Automated Fetching**: Yahoo Finance integration with retry logic
-- ✅ **Data Validation**: Quality checks and error handling
-- ✅ **Performance Metrics**: Sharpe ratio, volatility, drawdown analysis
-- ✅ **Backup & Restore**: Complete data backup functionality
-- ✅ **Supabase Integration**: Cloud database storage
-
-## 🛠️ Scripts
-
-### `fetch_all_assets.py`
-Main data fetching script with enhanced features:
+### 1. **API Endpoint**
+When a user requests an ETF that doesn't exist in your database:
 
 ```bash
-python fetch_all_assets.py
+POST /api/portfolio/add-asset
+{
+  "ticker": "ARKK"
+}
 ```
 
-**Features:**
-- Fetches 50+ assets across multiple categories
-- Retry logic with exponential backoff
-- Data quality validation
-- Performance metrics calculation
-- Comprehensive logging
+### 2. **Automatic Processing**
+The system will:
+1. Check if the ETF already exists in Supabase
+2. If not, fetch historical data from Yahoo Finance
+3. Validate data quality (minimum 1 year, reasonable returns)
+4. Upload to Supabase database
+5. Return success/failure status
 
-**Output Files:**
-- `all_asset_returns.csv` - Main data file
-- `asset_performance_metrics_YYYYMMDD_HHMMSS.csv` - Performance metrics
-- `data_quality_report_YYYYMMDD_HHMMSS.json` - Quality report
+### 3. **Daily Automation**
+GitHub Actions runs daily to:
+- Process any pending asset requests
+- Update existing asset data
+- Generate reports
 
-### `upload_to_supabase.py`
-Enhanced upload script with validation:
+## 🚀 **Setup**
+
+### 1. **Environment Variables**
+Set these in your Vercel deployment:
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_KEY` - Your Supabase service key
+
+### 2. **GitHub Secrets**
+Add these to your GitHub repository:
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_KEY` - Your Supabase service key
+
+### 3. **Enable GitHub Actions**
+1. Go to your GitHub repository
+2. **Actions** tab → **Enable workflows**
+3. The pipeline will start running automatically
+
+## 📊 **Usage Examples**
+
+### **Add a New ETF**
+```bash
+curl -X POST https://your-chatbot.vercel.app/api/portfolio/add-asset \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "ARKK"}'
+```
+
+### **Response**
+```json
+{
+  "success": true,
+  "message": "Successfully added ARKK with 120 data points",
+  "action": "added",
+  "data_points": 120,
+  "date_range": {
+    "start": "2014-10-31",
+    "end": "2024-12-31"
+  },
+  "processing_time_ms": 2500
+}
+```
+
+### **Manual Processing**
+You can also manually trigger the pipeline:
 
 ```bash
-python upload_to_supabase.py
+# Process specific tickers
+python services/data-pipeline/add_new_asset.py ARKK
+
+# Run full pipeline
+python services/data-pipeline/dynamic_asset_fetcher.py
 ```
 
-**Features:**
-- Data validation before upload
-- Batch upload with progress tracking
-- Upload verification
-- Comprehensive reporting
-- Error handling and recovery
+## 🔍 **Monitoring**
 
-### `backup_restore.py`
-Backup and restore functionality:
+### **GitHub Actions**
+- View runs in the **Actions** tab
+- Check logs for any errors
+- Manual triggers available
 
+### **Database**
+- Check `asset_returns` table for new data
+- Monitor data quality metrics
+- Track asset coverage
+
+## 🛠️ **Troubleshooting**
+
+### **Common Issues**
+
+1. **"Could not fetch valid data"**
+   - ETF ticker might be invalid
+   - Yahoo Finance might be down
+   - Check ticker format (uppercase)
+
+2. **"Failed to upload to database"**
+   - Check Supabase credentials
+   - Verify database permissions
+   - Check for duplicate data
+
+3. **"Python script failed"**
+   - Check Python dependencies
+   - Verify file paths
+   - Check environment variables
+
+### **Debug Mode**
+Enable debug logging:
 ```bash
-# Create backup
-python backup_restore.py backup
-
-# List available backups
-python backup_restore.py list
-
-# Restore from backup
-python backup_restore.py restore --file backups/backup_file.zip
+export LOG_LEVEL=DEBUG
+python services/data-pipeline/add_new_asset.py ARKK
 ```
 
-## 📈 Asset Categories
+## 📈 **Performance**
 
-### US Equity
-- **Large Cap**: SPY, VTI, SPLG, IVV, VOO
-- **Small Cap**: IWM, VB, VBR, IJR
-- **Growth**: QQQ, VUG, IWF, MGK
-- **Value**: VTV, IWD, VYM, DVY
+- **Typical processing time**: 2-5 seconds per ETF
+- **Data validation**: Automatic quality checks
+- **Rate limiting**: Respects Yahoo Finance limits
+- **Error handling**: Graceful failure with detailed logs
 
-### International Equity
-- **Developed**: VEA, SPDW, EFA, IXUS
-- **Emerging**: VWO, EEM, IEMG, SCHE
-- **Small Cap**: VSS, SCZ, GWX
+## 🔒 **Security**
 
-### Fixed Income
-- **Treasury Short**: BIL, SHY, SPTS, VGSH
-- **Treasury Medium**: IEF, VGIT, SPTI
-- **Treasury Long**: TLT, VGLT, SPTL
-- **Corporate**: AGG, BND, VCIT, LQD
-- **High Yield**: HYG, JNK, SHYG
-- **International**: BNDX, BWX, IGOV
+- **API Key Authentication**: Required for all endpoints
+- **Rate Limiting**: Prevents abuse
+- **Input Validation**: Sanitizes all inputs
+- **Error Handling**: No sensitive data in logs
 
-### Alternative Assets
-- **Real Estate**: VNQ, IYR, SCHH, RWO
-- **Commodities**: GLD, SLV, DJP, PDBC
-- **Cryptocurrency**: IBIT, BITO, ETHE, GBTC
+## 📝 **Logs**
 
-### Sector ETFs
-- **Technology**: XLK, VGT, FTEC, IYW
-- **Healthcare**: XLV, VHT, FHLC, IYH
-- **Financial**: XLF, VFH, FXO, IYF
-- **Energy**: XLE, VDE, FENY, IYE
-- **Utilities**: XLU, VPU, FUTY, IDU
-- **Consumer**: XLY, VCR, FDIS, IYC
+All operations are logged with:
+- Timestamp
+- Action performed
+- Success/failure status
+- Error details (if any)
+- Processing time
 
-### Factor ETFs
-- **Momentum**: MTUM, QMOM, PDP
-- **Quality**: QUAL, SPHQ, JQUA
-- **Low Volatility**: USMV, SPLV, EFAV
-- **Dividend**: VYM, DVY, SCHD, DGRO
+## 🎯 **Next Steps**
 
-## 🔧 Configuration
+1. **Test the API endpoint** with a new ETF
+2. **Enable GitHub Actions** for automation
+3. **Monitor the pipeline** for any issues
+4. **Add more validation rules** as needed
 
-### Environment Variables
+---
 
-```bash
-# Supabase Configuration
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-service-key
-```
-
-### Data Schema
-
-The main data table (`asset_returns`) has the following structure:
-
-```sql
-CREATE TABLE asset_returns (
-    asset_ticker VARCHAR(10) NOT NULL,
-    return_date DATE NOT NULL,
-    monthly_return DECIMAL(10,6) NOT NULL,
-    price DECIMAL(10,2),
-    volume BIGINT,
-    asset_name VARCHAR(100),
-    asset_category VARCHAR(50),
-    expense_ratio DECIMAL(5,4),
-    PRIMARY KEY (asset_ticker, return_date)
-);
-```
-
-## 📊 Data Quality
-
-### Validation Checks
-- Missing returns detection
-- Extreme values identification (>50% or >100%)
-- Duplicate row detection
-- Date range validation
-- Asset coverage analysis
-
-### Performance Metrics
-- Total return calculation
-- Annualized return and volatility
-- Sharpe ratio computation
-- Maximum drawdown analysis
-- Data coverage statistics
-
-## 🚀 Deployment
-
-### Local Development
-```bash
-# Set up virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run scripts
-python fetch_all_assets.py
-python upload_to_supabase.py
-```
-
-### Production (Cron Job)
-```bash
-# Add to crontab for daily updates
-0 6 * * * cd /path/to/portfolio-data && python fetch_all_assets.py && python upload_to_supabase.py
-```
-
-### Docker (Optional)
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["python", "fetch_all_assets.py"]
-```
-
-## 📈 Monitoring
-
-### Logs
-All scripts provide comprehensive logging:
-- Request/response tracking
-- Error handling and reporting
-- Performance metrics
-- Data quality statistics
-
-### Reports
-Generated reports include:
-- Data quality validation results
-- Upload statistics and verification
-- Performance metrics by asset
-- Backup and restore logs
-
-## 🔄 Updates
-
-### Recent Updates (v2.0.0)
-
-- ✅ Expanded to 50+ assets across multiple categories
-- ✅ Enhanced error handling and retry logic
-- ✅ Added performance metrics calculation
-- ✅ Implemented backup and restore functionality
-- ✅ Improved data validation and quality checks
-- ✅ Added comprehensive logging and reporting
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Yahoo Finance API Errors**
-   - Check internet connection
-   - Verify ticker symbols are valid
-   - Wait and retry (rate limiting)
-
-2. **Supabase Connection Issues**
-   - Verify SUPABASE_URL and SUPABASE_KEY
-   - Check Supabase project status
-   - Ensure table schema is correct
-
-3. **Data Quality Issues**
-   - Review quality reports
-   - Check for missing or extreme values
-   - Verify date ranges
-
-4. **Upload Failures**
-   - Check batch size (reduce if needed)
-   - Verify data format
-   - Review error logs
-
-## 📄 License
-
-MIT License - see main project README for details.
+**Need help?** Check the troubleshooting guide or open an issue in the repository.
