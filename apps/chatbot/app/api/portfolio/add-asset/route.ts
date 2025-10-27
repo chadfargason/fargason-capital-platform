@@ -80,7 +80,7 @@ async function addNewAsset(ticker: string): Promise<AssetResponse> {
         try {
           const result = JSON.parse(output);
           resolve(result);
-        } catch (parseError) {
+        } catch {
           resolve({
             success: false,
             message: `Failed to parse Python output: ${output}`,

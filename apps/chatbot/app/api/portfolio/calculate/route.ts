@@ -36,7 +36,7 @@ function corsHeaders() {
 }
 
 // Check which assets are missing from the database
-async function checkMissingAssets(supabase: any, assets: string[]): Promise<string[]> {
+async function checkMissingAssets(supabase: ReturnType<typeof createClient>, assets: string[]): Promise<string[]> {
   try {
     const { data, error } = await supabase
       .from('asset_returns')
@@ -49,7 +49,7 @@ async function checkMissingAssets(supabase: any, assets: string[]): Promise<stri
       return assets; // If we can't check, assume all are missing
     }
 
-    const existingAssets = new Set(data?.map((row: any) => row.asset_ticker) || []);
+    const existingAssets = new Set(data?.map((row: { asset_ticker: string }) => row.asset_ticker) || []);
     const missingAssets = assets.filter(asset => !existingAssets.has(asset));
     
     console.log(`[Asset Check] Existing: ${existingAssets.size}, Missing: ${missingAssets.length}`);
@@ -87,14 +87,14 @@ async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
       const python = spawn('python', [pythonScript, ticker]);
       
       let output = '';
-      let error = '';
 
       python.stdout.on('data', (data) => {
         output += data.toString();
       });
 
       python.stderr.on('data', (data) => {
-        error += data.toString();
+        // Log stderr but don't store it since we're not using it
+        console.log(`[Asset Fetch] ${ticker} stderr:`, data.toString());
       });
 
       python.on('close', (code) => {
@@ -108,7 +108,7 @@ async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
               errorCount++;
               console.log(`[Asset Fetch] ✗ ${ticker}: ${result.message}`);
             }
-          } catch (e) {
+          } catch {
             errorCount++;
             console.log(`[Asset Fetch] ✗ ${ticker}: Failed to parse output`);
           }
