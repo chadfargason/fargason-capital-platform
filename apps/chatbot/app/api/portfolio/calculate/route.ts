@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
-import { spawn } from 'child_process';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface CalculateRequest {
@@ -61,71 +60,55 @@ async function checkMissingAssets(supabase: SupabaseClient, assets: string[]): P
   }
 }
 
-// Fetch missing assets using the Python script
+// Fetch missing assets using the HTTP API endpoint
 async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
   if (missingAssets.length === 0) return true;
 
   console.log(`[Asset Fetch] Fetching ${missingAssets.length} missing assets: ${missingAssets.join(', ')}`);
   
-  return new Promise((resolve) => {
-    const pythonScript = join(process.cwd(), 'services', 'data-pipeline', 'add_new_asset.py');
-    
-    // Process assets one by one to avoid overwhelming Yahoo Finance
-    let currentIndex = 0;
-    let successCount = 0;
-    let errorCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
 
-    const processNextAsset = () => {
-      if (currentIndex >= missingAssets.length) {
-        console.log(`[Asset Fetch] Complete: ${successCount} success, ${errorCount} errors`);
-        resolve(errorCount === 0);
-        return;
-      }
-
-      const ticker = missingAssets[currentIndex];
-      console.log(`[Asset Fetch] Processing ${ticker} (${currentIndex + 1}/${missingAssets.length})`);
+  for (const ticker of missingAssets) {
+    try {
+      console.log(`[Asset Fetch] Processing ${ticker} (${successCount + errorCount + 1}/${missingAssets.length})`);
       
-      const python = spawn('python', [pythonScript, ticker]);
-      
-      let output = '';
-
-      python.stdout.on('data', (data) => {
-        output += data.toString();
+      // Call our own API endpoint instead of Python script
+      const response = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/portfolio/add-asset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ticker }),
       });
 
-      python.stderr.on('data', (data) => {
-        // Log stderr but don't store it since we're not using it
-        console.log(`[Asset Fetch] ${ticker} stderr:`, data.toString());
-      });
-
-      python.on('close', (code) => {
-        if (code === 0) {
-          try {
-            const result = JSON.parse(output);
-            if (result.success) {
-              successCount++;
-              console.log(`[Asset Fetch] ✓ ${ticker}: ${result.message}`);
-            } else {
-              errorCount++;
-              console.log(`[Asset Fetch] ✗ ${ticker}: ${result.message}`);
-            }
-          } catch {
-            errorCount++;
-            console.log(`[Asset Fetch] ✗ ${ticker}: Failed to parse output`);
-          }
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          successCount++;
+          console.log(`[Asset Fetch] ✓ ${ticker}: ${result.message}`);
         } else {
           errorCount++;
-          console.log(`[Asset Fetch] ✗ ${ticker}: Python script failed`);
+          console.log(`[Asset Fetch] ✗ ${ticker}: ${result.message}`);
         }
-        
-        currentIndex++;
-        // Add small delay between requests to be respectful to Yahoo Finance
-        setTimeout(processNextAsset, 1000);
-      });
-    };
+      } else {
+        errorCount++;
+        console.log(`[Asset Fetch] ✗ ${ticker}: HTTP ${response.status}`);
+      }
+      
+      // Add delay between requests to be respectful
+      if (successCount + errorCount < missingAssets.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+    } catch (error) {
+      errorCount++;
+      console.log(`[Asset Fetch] ✗ ${ticker}: ${error}`);
+    }
+  }
 
-    processNextAsset();
-  });
+  console.log(`[Asset Fetch] Complete: ${successCount} success, ${errorCount} errors`);
+  return errorCount === 0;
 }
 
 // OPTIMIZED: Generate CSV from monthly data using array.join()
