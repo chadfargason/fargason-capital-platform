@@ -4,6 +4,8 @@ import { spawn } from 'child_process';
 import { join } from 'path';
 
 // Add asset API endpoint - triggers automatic asset fetching
+// This endpoint allows the portfolio calculator to automatically fetch missing assets
+// Version: Latest with TypeScript warnings fixed
 
 interface AddAssetRequest {
   ticker: string;
