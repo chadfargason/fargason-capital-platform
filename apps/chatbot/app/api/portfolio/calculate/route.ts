@@ -76,13 +76,20 @@ async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
       console.log(`[Asset Fetch] Processing ${ticker} (${successCount + errorCount + 1}/${missingAssets.length})`);
       
       // Call our own API endpoint instead of Python script
-      const response = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/portfolio/add-asset`, {
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://fargason-capital-platform-ttgo.vercel.app';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+      
+      const response = await fetch(`${baseUrl}/api/portfolio/add-asset`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ ticker }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const result = await response.json();
@@ -95,7 +102,8 @@ async function fetchMissingAssets(missingAssets: string[]): Promise<boolean> {
         }
       } else {
         errorCount++;
-        console.log(`[Asset Fetch] ✗ ${ticker}: HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.log(`[Asset Fetch] ✗ ${ticker}: HTTP ${response.status} - ${errorText}`);
       }
       
       // Add delay between requests to be respectful
