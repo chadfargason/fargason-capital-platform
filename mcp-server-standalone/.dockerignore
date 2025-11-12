@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.example
+*.log
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+.DS_Store

@@ -1,0 +1,6 @@
+# Generated lockfiles we do not commit
+apps/website/package-lock.json
+
+# Backup snapshots
+apps/chatbot/app/api/portfolio/calculate/route.backup.pre-refactor.ts
+
